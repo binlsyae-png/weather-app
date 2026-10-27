@@ -174,6 +174,7 @@ function setupEventListeners() {
   // 폼 제출 (검색)
   searchForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    hideStatusMessage(); // 다음 검색 시 이전 안내 메시지 즉시 삭제
     const query = cityInput.value.trim();
     if (!query) {
       showStatusMessage('warning', '지역명을 입력해 주세요', '검색하실 지역 이름을 입력란에 적어주세요. (예: 서울, 도쿄, 뉴욕)');
@@ -182,22 +183,28 @@ function setupEventListeners() {
     fetchWeatherByCity(query);
   });
 
-  // 검색어 입력 시 오타 경고 스타일 및 x 버튼 해제
+  // 검색창에 새 글자를 입력할 때 이전 오타 안내 메시지 즉시 제거
   cityInput.addEventListener('input', () => {
+    hideStatusMessage(); // 다음 검색어 입력 시작 시 이전 안내 메시지 즉시 숨김
     clearBtn.hidden = !cityInput.value.trim();
-    cityInput.classList.remove('input-error');
-    searchForm.classList.remove('shake');
+  });
+
+  // 검색창 클릭/포커스 시에도 이전 오타 경고가 닫히도록 처리
+  cityInput.addEventListener('focus', () => {
+    if (statusMessage && !statusMessage.hidden) {
+      hideStatusMessage();
+    }
   });
 
   // 인풋 지우기 버튼
   clearBtn.addEventListener('click', () => {
     cityInput.value = '';
     clearBtn.hidden = true;
-    cityInput.classList.remove('input-error');
+    hideStatusMessage();
     cityInput.focus();
   });
 
-  // 상태 알림 닫기
+  // 상태 알림 닫기 버튼
   statusClose.addEventListener('click', () => {
     hideStatusMessage();
   });
@@ -209,9 +216,9 @@ function setupEventListeners() {
     if (suggestionBtn) {
       const targetCity = suggestionBtn.dataset.city;
       if (targetCity) {
+        hideStatusMessage(); // 안내창 닫기
         cityInput.value = targetCity;
         clearBtn.hidden = false;
-        cityInput.classList.remove('input-error');
         fetchWeatherByCity(targetCity);
       }
       return;
@@ -222,6 +229,7 @@ function setupEventListeners() {
     if (forceBtn) {
       const rawCity = forceBtn.dataset.city;
       if (rawCity) {
+        hideStatusMessage(); // 안내창 닫기
         fetchWeatherByCity(rawCity, true); // forceSearch = true
       }
     }
@@ -233,15 +241,16 @@ function setupEventListeners() {
     if (!chip) return;
     const city = chip.dataset.city;
     if (city) {
+      hideStatusMessage(); // 이전 오타 안내 메시지 즉시 제거
       cityInput.value = city;
       clearBtn.hidden = false;
-      cityInput.classList.remove('input-error');
       fetchWeatherByCity(city);
     }
   });
 
   // 현재 내 위치 날씨 조회 버튼
   geoBtn.addEventListener('click', () => {
+    hideStatusMessage(); // 이전 안내 메시지 즉시 제거
     fetchWeatherByCurrentLocation();
   });
 
@@ -293,6 +302,7 @@ function showStatusMessage(type = 'error', title, descHtml) {
  */
 function hideStatusMessage() {
   statusMessage.hidden = true;
+  statusDesc.innerHTML = '';
   cityInput.classList.remove('input-error');
   searchForm.classList.remove('shake');
 }
