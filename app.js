@@ -405,7 +405,13 @@ function findClosestCitySuggestion(query) {
 async function fetchWeatherByCity(query, forceSearch = false) {
   const cleanQuery = query.trim();
   setLoading(true);
+  
+  // 검색 시마다 화면 상태 완전 초기화 (새로고침)
   hideStatusMessage();
+  weatherCard.hidden = true;
+  emptyState.hidden = true;
+  cityInput.classList.remove('input-error');
+  searchForm.classList.remove('shake');
 
   try {
     // 1단계: 정확히 일치하는 내장 대표 도시 확인
@@ -416,30 +422,27 @@ async function fetchWeatherByCity(query, forceSearch = false) {
     }
 
     // 2단계: [사전 오타 검사 (Pre-Search Typo Detection)]
-    // 사용자가 '도코' 등 유명 도시의 오타를 쳤을 때, 해외 엉뚱한 오지(예: 수단 Jebel Doko)를 가져오지 않고
-    // 즉시 오타 안내 메시지를 화면에 띄웁니다!
-    if (!forceSearch) {
-      const preSuggestion = findClosestCitySuggestion(cleanQuery);
-      if (preSuggestion) {
-        // 기존 날씨 카드 숨기기
-        weatherCard.hidden = true;
-        emptyState.hidden = false;
+    // '도코'(도쿄), '서을'(서울), '부선'(부산) 등 명백한 오타 사전(COMMON_TYPOS)에 있는 경우만 가로챔!
+    // '김제', '나주' 등 실제 존재하는 도시는 가로채지 않고 정상 지오코딩으로 진행!
+    if (!forceSearch && COMMON_TYPOS[cleanQuery]) {
+      const preSuggestion = COMMON_TYPOS[cleanQuery];
+      weatherCard.hidden = true;
+      emptyState.hidden = false;
 
-        const descHtml = `
-          <div>입력하신 '<strong>${cleanQuery}</strong>'에 오타가 있나요?</div>
-          <div class="status-suggestion-box">
-            <span class="status-suggestion-text">혹시 <strong>"${preSuggestion}"</strong>(을)를 찾으셨나요?</span>
-            <button type="button" class="suggestion-btn" data-city="${preSuggestion}">
-              👉 "${preSuggestion}" 날씨 바로보기
-            </button>
-            <button type="button" class="force-search-btn" data-city="${cleanQuery}">
-              '${cleanQuery}' 그대로 검색
-            </button>
-          </div>
-        `;
-        showStatusMessage('typo', '지역명 오타 감지 안내', descHtml);
-        return; // 외부 Geocoding을 중단하고 사용자에게 선택권 제공
-      }
+      const descHtml = `
+        <div>입력하신 '<strong>${cleanQuery}</strong>'에 오타가 있나요?</div>
+        <div class="status-suggestion-box">
+          <span class="status-suggestion-text">혹시 <strong>"${preSuggestion}"</strong>(을)를 찾으셨나요?</span>
+          <button type="button" class="suggestion-btn" data-city="${preSuggestion}">
+            👉 "${preSuggestion}" 날씨 바로보기
+          </button>
+          <button type="button" class="force-search-btn" data-city="${cleanQuery}">
+            '${cleanQuery}' 그대로 검색
+          </button>
+        </div>
+      `;
+      showStatusMessage('typo', '지역명 오타 감지 안내', descHtml);
+      return;
     }
 
     // 3단계: Open-Meteo Geocoding API 검색
@@ -463,7 +466,7 @@ async function fetchWeatherByCity(query, forceSearch = false) {
       console.warn('Open-Meteo Geocoding 건너뜀:', e);
     }
 
-    // 4단계: 일치 항목이 없으면 OpenStreetMap Nominatim 폴백 검색
+    // 4단계: 일치 항목이 없으면 OpenStreetMap Nominatim 폴백 검색 (김제, 천안 등 국내 모든 시·군·구 정밀 지원)
     if (!geoResult) {
       try {
         const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=1&accept-language=ko`;
@@ -492,7 +495,7 @@ async function fetchWeatherByCity(query, forceSearch = false) {
       }
     }
 
-    // 5단계: 지오코딩 실패 또는 미등록 지역인 경우 오타 안내 메시지 출력
+    // 5단계: 지오코딩으로도 찾을 수 없는 경우(진짜 오타/미등록 지역인 경우)에만 오타 추천 엔진 가동!
     if (!geoResult) {
       weatherCard.hidden = true;
       emptyState.hidden = false;
@@ -513,7 +516,7 @@ async function fetchWeatherByCity(query, forceSearch = false) {
         const descHtml = `
           <div>입력하신 '<strong>${cleanQuery}</strong>'에 해당하는 지역을 찾지 못했습니다.</div>
           <div style="margin-top: 4px; font-size: 0.84rem; opacity: 0.85;">
-            지역명의 철자나 오타가 없는지 확인해 보세요. (예: 서울, 도쿄, 부산, 뉴욕, 파리 등)
+            지역명의 철자나 오타가 없는지 확인해 보세요. (예: 서울, 천안, 김제, 도쿄, 뉴욕 등)
           </div>
         `;
         showStatusMessage('typo', '지역명 확인 및 오타 안내', descHtml);
@@ -522,10 +525,12 @@ async function fetchWeatherByCity(query, forceSearch = false) {
     }
 
     // 정상적으로 유효한 좌표를 얻은 경우 날씨 정보 조회
+    hideStatusMessage();
     await fetchWeatherByCoordinates(geoResult.lat, geoResult.lon, geoResult.name, geoResult.country);
 
   } catch (error) {
     console.error('날씨 데이터 조회 에러:', error);
+    weatherCard.hidden = true;
     showStatusMessage(
       'error',
       '날씨 데이터를 가져오지 못했습니다',
