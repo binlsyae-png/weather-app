@@ -518,6 +518,11 @@ body.theme-thunder .glow-2 {
   animation: slideDown 0.3s ease;
 }
 
+.status-message[hidden],
+[hidden] {
+  display: none !important;
+}
+
 .status-message.info {
   background: rgba(56, 189, 248, 0.12);
   border-color: rgba(56, 189, 248, 0.35);

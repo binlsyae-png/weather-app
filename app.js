@@ -96,7 +96,9 @@ const COMMON_TYPOS = {
   '도쿄오': '도쿄',
   '도꾜': '도쿄',
   '처나': '천안',
+  '천애': '천안',
   '천안ㄴ': '천안',
+  '저누': '전주',
   '서을': '서울',
   '소울': '서울',
   '설': '서울',
@@ -298,6 +300,8 @@ function showStatusMessage(type = 'error', title = '안내', descHtml = '') {
 
   statusTitle.textContent = title;
   statusDesc.innerHTML = descHtml || '<div>지역명을 다시 확인해 주세요.</div>';
+  statusMessage.hidden = false;
+  statusMessage.style.display = 'flex'; // 인라인 스타일로 100% 화면 노출 보장
 }
 
 /**
@@ -306,6 +310,8 @@ function showStatusMessage(type = 'error', title = '안내', descHtml = '') {
 function hideStatusMessage() {
   if (statusMessage) {
     statusMessage.hidden = true;
+    statusMessage.style.display = 'none'; // 인라인 스타일로 100% 화면에서 즉각 제거
+    statusDesc.innerHTML = '';
   }
   if (cityInput) {
     cityInput.classList.remove('input-error');
