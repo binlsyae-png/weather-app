@@ -1,7 +1,7 @@
 /**
  * SkyCast - 실시간 날씨 웹 애플리케이션
  * 완전 무료 & API 키 불필요 (Open-Meteo API + OpenStreetMap Nominatim Geocoding)
- * 지역명 오타 사전 및 한글 자모 Levenshtein 알고리즘 탑재
+ * 지역명 오타 감지 및 스마트 원클릭 교정 알고리즘
  */
 
 // WMO 날씨 해석 코드 매핑 테이블
@@ -58,6 +58,13 @@ const QUICK_CITY_MAP = {
   '청주': { name: '청주시', lat: 36.6424, lon: 127.4890, country: 'KR' },
   '전주': { name: '전주시', lat: 35.8242, lon: 127.1480, country: 'KR' },
   '천안': { name: '천안시', lat: 36.8151, lon: 127.1139, country: 'KR' },
+  '김제': { name: '김제시', lat: 35.8036, lon: 126.8808, country: 'KR' },
+  '나주': { name: '나주시', lat: 35.0160, lon: 126.7108, country: 'KR' },
+  '아산': { name: '아산시', lat: 36.7898, lon: 127.0019, country: 'KR' },
+  '군산': { name: '군산시', lat: 35.9676, lon: 126.7366, country: 'KR' },
+  '익산': { name: '익산시', lat: 35.9483, lon: 126.9576, country: 'KR' },
+  '포항': { name: '포항시', lat: 36.0190, lon: 129.3435, country: 'KR' },
+  '창원': { name: '창원시', lat: 35.2280, lon: 128.6811, country: 'KR' },
   '도쿄': { name: '도쿄 (Tokyo)', lat: 35.6895, lon: 139.6917, country: 'JP' },
   '오사카': { name: '오사카 (Osaka)', lat: 34.6937, lon: 135.5023, country: 'JP' },
   '뉴욕': { name: '뉴욕 (New York)', lat: 40.7128, lon: -74.0060, country: 'US' },
@@ -66,12 +73,30 @@ const QUICK_CITY_MAP = {
   '베이징': { name: '베이징 (Beijing)', lat: 39.9042, lon: 116.4074, country: 'CN' }
 };
 
-// 사용자가 자주 입력하는 대표 오타 사전 (즉시 추천)
+// 대한민국 모든 시/군 및 세계 주요 도시 정식 명칭 목록 (오타가 아닌 실제 유효 도시)
+const VALID_CITIES = [
+  '서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종',
+  '수원', '성남', '의정부', '안양', '부천', '광명', '평택', '동두천', '안산', '고양', '과천', '구리', '남양주', '오산', '시흥', '군포', '의왕', '하남', '용인', '파주', '이천', '안성', '김포', '화성', '광주', '양주', '포천', '여주', '연천', '가평', '양평',
+  '춘천', '원주', '강릉', '동해', '태백', '속초', '삼척', '홍천', '횡성', '영월', '평창', '정선', '철원', '화천', '양구', '인제', '고성', '양양',
+  '청주', '충주', '제천', '보은', '옥천', '영동', '증평', '진천', '괴산', '음성', '단양',
+  '천안', '공주', '보령', '아산', '서산', '논산', '계룡', '당진', '금산', '부여', '서천', '청양', '홍성', '예산', '태안',
+  '전주', '군산', '익산', '정읍', '남원', '김제', '완주', '진안', '무주', '장수', '임실', '순창', '고창', '부안',
+  '목포', '여수', '순천', '나주', '광양', '담양', '곡성', '구례', '고흥', '보성', '화순', '장흥', '강진', '해남', '영암', '무안', '함평', '영광', '장성', '완도', '진도', '신안',
+  '포항', '경주', '김천', '안동', '구미', '영주', '영천', '상주', '문경', '경산', '군위', '의성', '청송', '영양', '영덕', '청도', '고령', '성주', '칠곡', '예천', '봉화', '울진', '울릉',
+  '창원', '진주', '통영', '사천', '김해', '밀양', '거제', '양산', '의령', '함안', '창녕', '고성', '남해', '하동', '산청', '함양', '거창', '합천',
+  '제주', '제주시', '서귀포', '서귀포시',
+  '도쿄', '오사카', '후쿠오카', '삿포로', '교토', '뉴욕', '로스앤젤레스', '샌프란시스코', '시카고',
+  '런던', '파리', '베를린', '로마', '마드리드', '베이징', '상하이', '방콕', '싱가포르', '시드니', '타이베이', '홍콩', '하노이', '다낭'
+];
+
+// 자주 발생하는 명백한 오타 사전
 const COMMON_TYPOS = {
   '도코': '도쿄',
   '됴쿄': '도쿄',
   '도쿄오': '도쿄',
   '도꾜': '도쿄',
+  '처나': '천안',
+  '천안ㄴ': '천안',
   '서을': '서울',
   '소울': '서울',
   '설': '서울',
@@ -95,34 +120,16 @@ const COMMON_TYPOS = {
   '페리': '파리',
   '패리': '파리',
   '배이징': '베이징',
-  '베이징ㅇ': '베이징',
   '런던ㄴ': '런던',
-  '론돈': '런던',
   '대군': '대구',
-  '대구우': '대구',
-  '때구': '대구',
   '인천시이': '인천',
   '일천': '인천',
   '광주우': '광주',
   '울산시이': '울산',
   '수원시이': '수원',
   '용인시이': '용인',
-  '창원시이': '창원',
-  '전주우': '전주',
-  '청주우': '청주',
-  '천안시이': '천안'
+  '창원시이': '창원'
 };
-
-// 오타 교정 및 제안을 위한 주요 도시 풀
-const POPULAR_CITIES = [
-  '서울', '부산', '제주', '제주도', '인천', '대구', '대전', '광주', '울산', '세종',
-  '수원', '성남', '고양', '용인', '청주', '전주', '천안', '창원', '포항', '안산',
-  '안양', '평택', '시흥', '파주', '의정부', '김포', '원주', '강릉', '춘천', '충주',
-  '군산', '익산', '목포', '여수', '순천', '경주', '구미', '아산', '양산', '거제',
-  '도쿄', '오사카', '후쿠오카', '삿포로', '교토', '뉴욕', '로스앤젤레스', '샌프란시스코',
-  '런던', '파리', '베를린', '로마', '마드리드', '베이징', '상하이', '방콕', '싱가포르',
-  '시드니', '타이베이', '홍콩', '하노이', '다낭'
-];
 
 // DOM 요소 캐싱
 const searchForm = document.getElementById('search-form');
@@ -174,7 +181,7 @@ function setupEventListeners() {
   // 폼 제출 (검색)
   searchForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    hideStatusMessage(); // 다음 검색 시 이전 안내 메시지 즉시 삭제
+    hideStatusMessage(); // 다음 검색 시작 시 이전 안내 메시지 즉시 삭제
     const query = cityInput.value.trim();
     if (!query) {
       showStatusMessage('warning', '지역명을 입력해 주세요', '검색하실 지역 이름을 입력란에 적어주세요. (예: 서울, 도쿄, 뉴욕)');
@@ -183,17 +190,15 @@ function setupEventListeners() {
     fetchWeatherByCity(query);
   });
 
-  // 검색창에 새 글자를 입력할 때 이전 오타 안내 메시지 즉시 제거
+  // 검색창에 새 글자를 입력할 때 이전 안내 메시지 즉시 제거
   cityInput.addEventListener('input', () => {
-    hideStatusMessage(); // 다음 검색어 입력 시작 시 이전 안내 메시지 즉시 숨김
+    hideStatusMessage(); // 사용자가 타이핑하기 시작하면 이전 안내창 즉시 숨김
     clearBtn.hidden = !cityInput.value.trim();
   });
 
-  // 검색창 클릭/포커스 시에도 이전 오타 경고가 닫히도록 처리
+  // 검색창 클릭/포커스 시에도 이전 안내 메시지 닫기
   cityInput.addEventListener('focus', () => {
-    if (statusMessage && !statusMessage.hidden) {
-      hideStatusMessage();
-    }
+    hideStatusMessage();
   });
 
   // 인풋 지우기 버튼
@@ -209,9 +214,8 @@ function setupEventListeners() {
     hideStatusMessage();
   });
 
-  // 상태 알림 내의 버튼 클릭 (이벤트 위임)
+  // 상태 알림 내의 추천 버튼 클릭 (이벤트 위임)
   statusDesc.addEventListener('click', (e) => {
-    // 1) 추천 도시 바로 검색
     const suggestionBtn = e.target.closest('.suggestion-btn');
     if (suggestionBtn) {
       const targetCity = suggestionBtn.dataset.city;
@@ -224,13 +228,12 @@ function setupEventListeners() {
       return;
     }
 
-    // 2) 원래 입력값 강제 검색
     const forceBtn = e.target.closest('.force-search-btn');
     if (forceBtn) {
       const rawCity = forceBtn.dataset.city;
       if (rawCity) {
-        hideStatusMessage(); // 안내창 닫기
-        fetchWeatherByCity(rawCity, true); // forceSearch = true
+        hideStatusMessage();
+        fetchWeatherByCity(rawCity, true);
       }
     }
   });
@@ -241,7 +244,7 @@ function setupEventListeners() {
     if (!chip) return;
     const city = chip.dataset.city;
     if (city) {
-      hideStatusMessage(); // 이전 오타 안내 메시지 즉시 제거
+      hideStatusMessage(); // 다음 검색 시 이전 안내창 즉시 제거
       cityInput.value = city;
       clearBtn.hidden = false;
       fetchWeatherByCity(city);
@@ -250,13 +253,14 @@ function setupEventListeners() {
 
   // 현재 내 위치 날씨 조회 버튼
   geoBtn.addEventListener('click', () => {
-    hideStatusMessage(); // 이전 안내 메시지 즉시 제거
+    hideStatusMessage(); // 이전 안내창 즉시 제거
     fetchWeatherByCurrentLocation();
   });
 
   // 새로고침 버튼
   refreshBtn.addEventListener('click', () => {
     if (lastFetchedLocation) {
+      hideStatusMessage();
       fetchWeatherByCoordinates(
         lastFetchedLocation.latitude,
         lastFetchedLocation.longitude,
@@ -270,7 +274,7 @@ function setupEventListeners() {
 /**
  * 상태 메시지(알림 배너) 표시 (오타 안내 및 추천 지원)
  */
-function showStatusMessage(type = 'error', title, descHtml) {
+function showStatusMessage(type = 'error', title = '안내', descHtml = '') {
   statusMessage.hidden = false;
   statusMessage.className = `status-message ${type === 'info' ? 'info' : type === 'warning' ? 'warning' : type === 'typo' ? 'typo-alert' : ''}`;
   
@@ -280,10 +284,9 @@ function showStatusMessage(type = 'error', title, descHtml) {
     statusIcon.textContent = '⚠️';
   } else if (type === 'typo') {
     statusIcon.textContent = '💡';
-    // 입력창 강조 및 폼 흔들림 애니메이션 트리거
     cityInput.classList.add('input-error');
     searchForm.classList.remove('shake');
-    void searchForm.offsetWidth; // 강제 리플로우
+    void searchForm.offsetWidth;
     searchForm.classList.add('shake');
   } else {
     statusIcon.textContent = '❌';
@@ -294,17 +297,22 @@ function showStatusMessage(type = 'error', title, descHtml) {
   }
 
   statusTitle.textContent = title;
-  statusDesc.innerHTML = descHtml;
+  statusDesc.innerHTML = descHtml || '<div>지역명을 다시 확인해 주세요.</div>';
 }
 
 /**
- * 상태 메시지 숨기기
+ * 상태 메시지 완전 숨기기 및 초기화
  */
 function hideStatusMessage() {
-  statusMessage.hidden = true;
-  statusDesc.innerHTML = '';
-  cityInput.classList.remove('input-error');
-  searchForm.classList.remove('shake');
+  if (statusMessage) {
+    statusMessage.hidden = true;
+  }
+  if (cityInput) {
+    cityInput.classList.remove('input-error');
+  }
+  if (searchForm) {
+    searchForm.classList.remove('shake');
+  }
 }
 
 /**
@@ -377,7 +385,7 @@ function getLevenshteinDistance(a, b) {
 
 /**
  * 오타가 났을 때 가장 유사한 추천 도시를 탐색
- * 예: '도코' -> '도쿄', '서을' -> '서울', '부선' -> '부산', '오사코' -> '오사카'
+ * 예: '처나' -> '천안', '도코' -> '도쿄', '서을' -> '서울', '부선' -> '부산'
  */
 function findClosestCitySuggestion(query) {
   // 1순위: 오타 매핑 사전
@@ -390,14 +398,14 @@ function findClosestCitySuggestion(query) {
   let bestCity = null;
   let bestScore = 0;
 
-  for (const city of POPULAR_CITIES) {
+  for (const city of VALID_CITIES) {
     if (city === query) continue;
     const decCity = decomposeHangul(city);
     const dist = getLevenshteinDistance(decQuery, decCity);
     const maxLen = Math.max(decQuery.length, decCity.length);
     const similarity = 1 - (dist / maxLen);
 
-    // 유사도 0.60 이상이거나 편집 거리가 1~2 이내인 경우
+    // 자모 유사도 0.60 이상이거나 편집 거리가 1~2 이내인 경우
     if (similarity > bestScore && (similarity >= 0.60 || dist <= 2)) {
       bestScore = similarity;
       bestCity = city;
@@ -416,46 +424,49 @@ async function fetchWeatherByCity(query, forceSearch = false) {
   const cleanQuery = query.trim();
   setLoading(true);
   
-  // 검색 시마다 화면 상태 완전 초기화 (새로고침)
+  // 검색 시작 시 이전 안내 메시지와 이전 카드를 완전히 새로고침(클리어)
   hideStatusMessage();
   weatherCard.hidden = true;
   emptyState.hidden = true;
-  cityInput.classList.remove('input-error');
-  searchForm.classList.remove('shake');
 
   try {
-    // 1단계: 정확히 일치하는 내장 대표 도시 확인
+    // 1단계: 정확히 일치하는 내장 대표 도시 확인 (즉각 로드)
     if (QUICK_CITY_MAP[cleanQuery]) {
       const match = QUICK_CITY_MAP[cleanQuery];
       await fetchWeatherByCoordinates(match.lat, match.lon, match.name, match.country);
       return;
     }
 
-    // 2단계: [사전 오타 검사 (Pre-Search Typo Detection)]
-    // '도코'(도쿄), '서을'(서울), '부선'(부산) 등 명백한 오타 사전(COMMON_TYPOS)에 있는 경우만 가로챔!
-    // '김제', '나주' 등 실제 존재하는 도시는 가로채지 않고 정상 지오코딩으로 진행!
-    if (!forceSearch && COMMON_TYPOS[cleanQuery]) {
-      const preSuggestion = COMMON_TYPOS[cleanQuery];
-      weatherCard.hidden = true;
-      emptyState.hidden = false;
+    // 2단계: 실제 유효한 도시인지 확인 (천안, 김제 등은 오타가 아님!)
+    const isKnownRealCity = VALID_CITIES.includes(cleanQuery) || 
+                            VALID_CITIES.includes(cleanQuery.replace(/(시|군|구)$/, ''));
 
-      const descHtml = `
-        <div>입력하신 '<strong>${cleanQuery}</strong>'에 오타가 있나요?</div>
-        <div class="status-suggestion-box">
-          <span class="status-suggestion-text">혹시 <strong>"${preSuggestion}"</strong>(을)를 찾으셨나요?</span>
-          <button type="button" class="suggestion-btn" data-city="${preSuggestion}">
-            👉 "${preSuggestion}" 날씨 바로보기
-          </button>
-          <button type="button" class="force-search-btn" data-city="${cleanQuery}">
-            '${cleanQuery}' 그대로 검색
-          </button>
-        </div>
-      `;
-      showStatusMessage('typo', '지역명 오타 감지 안내', descHtml);
-      return;
+    // 3단계: [오타 감지 엔진]
+    // 실제 도시가 아닌 경우에 '처나'(천안), '도코'(도쿄), '서을'(서울) 등 오타 검출!
+    if (!forceSearch && !isKnownRealCity) {
+      const suggestion = findClosestCitySuggestion(cleanQuery);
+      if (suggestion) {
+        weatherCard.hidden = true;
+        emptyState.hidden = false;
+
+        const descHtml = `
+          <div>입력하신 '<strong>${cleanQuery}</strong>'에 오타가 있나요?</div>
+          <div class="status-suggestion-box">
+            <span class="status-suggestion-text">혹시 <strong>"${suggestion}"</strong>(을)를 찾으셨나요?</span>
+            <button type="button" class="suggestion-btn" data-city="${suggestion}">
+              👉 "${suggestion}" 날씨 바로보기
+            </button>
+            <button type="button" class="force-search-btn" data-city="${cleanQuery}">
+              '${cleanQuery}' 그대로 검색
+            </button>
+          </div>
+        `;
+        showStatusMessage('typo', '지역명 오타 감지 안내', descHtml);
+        return; // 오타 감지 시 엉뚱한 해외 지명을 검색하지 않고 안내창 표시 후 중단
+      }
     }
 
-    // 3단계: Open-Meteo Geocoding API 검색
+    // 4단계: Open-Meteo Geocoding API 검색
     let geoResult = null;
     try {
       const openMeteoGeoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanQuery)}&count=3&language=ko&format=json`;
@@ -476,7 +487,7 @@ async function fetchWeatherByCity(query, forceSearch = false) {
       console.warn('Open-Meteo Geocoding 건너뜀:', e);
     }
 
-    // 4단계: 일치 항목이 없으면 OpenStreetMap Nominatim 폴백 검색 (김제, 천안 등 국내 모든 시·군·구 정밀 지원)
+    // 5단계: 일치 항목이 없으면 OpenStreetMap Nominatim 폴백 검색
     if (!geoResult) {
       try {
         const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=1&accept-language=ko`;
@@ -505,7 +516,7 @@ async function fetchWeatherByCity(query, forceSearch = false) {
       }
     }
 
-    // 5단계: 지오코딩으로도 찾을 수 없는 경우(진짜 오타/미등록 지역인 경우)에만 오타 추천 엔진 가동!
+    // 6단계: 지오코딩으로도 찾을 수 없는 경우 (진짜 존재하지 않는 지역/오타)
     if (!geoResult) {
       weatherCard.hidden = true;
       emptyState.hidden = false;
@@ -525,7 +536,7 @@ async function fetchWeatherByCity(query, forceSearch = false) {
       } else {
         const descHtml = `
           <div>입력하신 '<strong>${cleanQuery}</strong>'에 해당하는 지역을 찾지 못했습니다.</div>
-          <div style="margin-top: 4px; font-size: 0.84rem; opacity: 0.85;">
+          <div style="margin-top: 6px; font-size: 0.85rem; opacity: 0.85;">
             지역명의 철자나 오타가 없는지 확인해 보세요. (예: 서울, 천안, 김제, 도쿄, 뉴욕 등)
           </div>
         `;
@@ -687,7 +698,8 @@ function renderWeather(data, locationName, countryCode) {
   windValEl.textContent = `${current.wind_speed_10m} m/s`;
   precipValEl.textContent = `${current.precipitation} mm`;
 
-  // UI 상태 노출 (날씨 카드 표시)
+  // UI 상태 노출 (날씨 카드 표시 및 안내창 완전 삭제)
+  hideStatusMessage();
   emptyState.hidden = true;
   weatherCard.hidden = false;
 }
@@ -703,17 +715,12 @@ function applyTheme(themeClass, isDay = true) {
 
 /**
  * 날씨 상태에 맞춘 배경 분위기 파티클 생성
- * - 비(Rain): 떨어지는 빗줄기
- * - 눈(Snow): 흩날리는 눈송이
- * - 맑은 밤(Night): 반짝이는 밤하늘 별빛
- * - 맑은 낮(Clear): 따스하게 빛나는 태양광 오라
  */
 function renderAtmosphericEffects(theme, isDay) {
   if (!ambientEffectsEl) return;
   ambientEffectsEl.innerHTML = ''; // 기존 파티클 정리
 
   if (theme === 'theme-rain' || theme === 'theme-thunder') {
-    // 비 내리는 분위기 연출
     const dropCount = theme === 'theme-thunder' ? 45 : 30;
     for (let i = 0; i < dropCount; i++) {
       const drop = document.createElement('div');
@@ -727,7 +734,6 @@ function renderAtmosphericEffects(theme, isDay) {
       ambientEffectsEl.appendChild(drop);
     }
   } else if (theme === 'theme-snow') {
-    // 눈 내리는 분위기 연출
     const flakeCount = 28;
     const snowIcons = ['❄', '❅', '•', '❆'];
     for (let i = 0; i < flakeCount; i++) {
@@ -743,7 +749,6 @@ function renderAtmosphericEffects(theme, isDay) {
       ambientEffectsEl.appendChild(flake);
     }
   } else if (theme === 'theme-night') {
-    // 맑은 밤하늘 별빛 연출
     const starCount = 35;
     for (let i = 0; i < starCount; i++) {
       const star = document.createElement('div');
@@ -758,7 +763,6 @@ function renderAtmosphericEffects(theme, isDay) {
       ambientEffectsEl.appendChild(star);
     }
   } else if (theme === 'theme-clear' && isDay) {
-    // 맑은 날 태양광 오라 연출
     const sunAura = document.createElement('div');
     sunAura.className = 'ambient-sun-aura';
     ambientEffectsEl.appendChild(sunAura);
