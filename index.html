@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SkyCast - 실시간 날씨 검색</title>
+  <meta name="description" content="전 세계 도시 및 지역의 현재 날씨와 기상 정보를 실시간으로 간편하게 조회할 수 있는 반응형 날씨 웹 애플리케이션입니다.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-default">
+  <div id="weather-ambient-effects" class="weather-ambient-effects" aria-hidden="true"></div>
+  <div class="background-glow glow-1"></div>
+  <div class="background-glow glow-2"></div>
+
+  <main class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <span class="logo-icon">⛅</span>
+        <h1 class="logo-title">SkyCast <span class="badge">Weather</span></h1>
+      </div>
+      <p class="subtitle">별도의 가입이나 키 없이 전 세계 도시의 실시간 날씨를 확인하세요</p>
+    </header>
+
+    <!-- Search Section -->
+    <section class="search-section" aria-label="지역 검색">
+      <form id="search-form" class="search-form" role="search">
+        <div class="search-input-wrapper">
+          <span class="search-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </span>
+          <input 
+            type="text" 
+            id="city-input" 
+            class="city-input" 
+            placeholder="도시 또는 지역명을 입력하세요 (예: 서울, 도쿄, 파리, 뉴욕, 부산...)" 
+            autocomplete="off"
+            required
+            aria-label="날씨를 검색할 도시명 입력"
+          />
+          <button type="button" id="clear-btn" class="clear-btn" title="입력 지우기" aria-label="입력 지우기" hidden>
+            &times;
+          </button>
+        </div>
+        <button type="submit" id="search-btn" class="primary-btn">
+          <span class="btn-text">날씨 검색</span>
+          <span class="btn-spinner" aria-hidden="true" hidden></span>
+        </button>
+        <button type="button" id="geo-btn" class="icon-btn" title="현재 내 위치 날씨 조회" aria-label="현재 내 위치 날씨 조회">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+          </svg>
+        </button>
+      </form>
+
+      <!-- Quick City Chips -->
+      <div class="quick-cities" aria-label="추천 인기 도시">
+        <span class="chips-label">인기 도시:</span>
+        <div class="chips-container" id="chips-container">
+          <button type="button" class="city-chip" data-city="서울">서울</button>
+          <button type="button" class="city-chip" data-city="부산">부산</button>
+          <button type="button" class="city-chip" data-city="제주">제주</button>
+          <button type="button" class="city-chip" data-city="도쿄">도쿄</button>
+          <button type="button" class="city-chip" data-city="뉴욕">뉴욕</button>
+          <button type="button" class="city-chip" data-city="런던">런던</button>
+          <button type="button" class="city-chip" data-city="파리">파리</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Notification / Alert Message Box -->
+    <div id="status-message" class="status-message" role="alert" aria-live="polite" hidden>
+      <div class="status-icon" id="status-icon">⚠️</div>
+      <div class="status-content">
+        <h4 id="status-title" class="status-title">안내</h4>
+        <div id="status-desc" class="status-desc">지역을 찾을 수 없습니다.</div>
+      </div>
+      <button type="button" id="status-close" class="status-close" aria-label="닫기">&times;</button>
+    </div>
+
+    <!-- Weather Display Card -->
+    <section id="weather-card" class="weather-card" aria-label="날씨 정보 카드" hidden>
+      <!-- Card Top: Location & Time -->
+      <div class="card-header">
+        <div class="location-box">
+          <div class="location-name-row">
+            <span class="pin-icon">📍</span>
+            <h2 id="location-name" class="location-name">서울</h2>
+            <span id="country-badge" class="country-badge">KR</span>
+          </div>
+          <p id="local-time" class="local-time">2026-10-27 09:30 기준</p>
+        </div>
+        <div class="condition-badge" id="condition-badge">
+          <span id="day-night-icon" class="badge-icon">☀️</span>
+          <span id="day-night-text" class="badge-text">주간</span>
+        </div>
+      </div>
+
+      <!-- Main Weather Summary -->
+      <div class="weather-main">
+        <div class="weather-visual">
+          <div id="weather-icon" class="main-emoji" aria-hidden="true">☀️</div>
+          <div class="weather-condition-group">
+            <span id="weather-text" class="weather-condition-text">맑음</span>
+            <span id="weather-desc" class="weather-condition-desc">쾌적하고 맑은 하늘입니다</span>
+          </div>
+        </div>
+
+        <div class="temp-group">
+          <div class="current-temp-wrapper">
+            <span id="current-temp" class="current-temp">18</span>
+            <span class="temp-unit">°C</span>
+          </div>
+          
+          <!-- Prominent High / Low Temperature Banner -->
+          <div class="today-temp-range-box" aria-label="오늘의 기온 범위">
+            <div class="temp-pill pill-max" title="오늘의 최고 기온">
+              <span class="pill-icon">🔺</span>
+              <span class="pill-label">최고</span>
+              <span id="max-temp" class="pill-val">21°C</span>
+            </div>
+            <div class="temp-pill pill-min" title="오늘의 최저 기온">
+              <span class="pill-icon">🔻</span>
+              <span class="pill-label">최저</span>
+              <span id="min-temp" class="pill-val">11°C</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detailed Metrics Grid (Including Dedicated High/Low Cards) -->
+      <div class="metrics-grid">
+        <div class="metric-card highlight-max">
+          <div class="metric-icon">🔺</div>
+          <div class="metric-info">
+            <span class="metric-label">오늘 최고기온</span>
+            <span id="metric-max-temp" class="metric-value">21°C</span>
+          </div>
+        </div>
+
+        <div class="metric-card highlight-min">
+          <div class="metric-icon">🔻</div>
+          <div class="metric-info">
+            <span class="metric-label">오늘 최저기온</span>
+            <span id="metric-min-temp" class="metric-value">11°C</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon">🌡️</div>
+          <div class="metric-info">
+            <span class="metric-label">체감 온도</span>
+            <span id="apparent-temp" class="metric-value">17.5°C</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon">💧</div>
+          <div class="metric-info">
+            <span class="metric-label">습도</span>
+            <span id="humidity-val" class="metric-value">48%</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon">💨</div>
+          <div class="metric-info">
+            <span class="metric-label">풍속</span>
+            <span id="wind-val" class="metric-value">2.4 m/s</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon">🌧️</div>
+          <div class="metric-info">
+            <span class="metric-label">강수량</span>
+            <span id="precip-val" class="metric-value">0 mm</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Info -->
+      <footer class="card-footer">
+        <span class="data-source">제공: Open-Meteo 공개 날씨 API (Free & No API Key)</span>
+        <button type="button" id="refresh-btn" class="refresh-btn" title="날씨 새로고침">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          새로고침
+        </button>
+      </footer>
+    </section>
+
+    <!-- Empty State Greeting -->
+    <div id="empty-state" class="empty-state">
+      <div class="empty-icon">🌍</div>
+      <h3>어디의 날씨가 궁금하신가요?</h3>
+      <p>도시명을 검색하거나 상단의 인기 도시 버튼을 눌러 실시간 기상 상태를 확인해 보세요.</p>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
